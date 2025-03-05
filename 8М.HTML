@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пазл 6х6</title>
+    <style>
+        /* CSS-код для адаптивного дизайна */
+        #puzzle-container {
+            position: relative;
+            width: 100%; /* Занимает всю ширину экрана */
+            max-width: 600px; /* Максимальная ширина контейнера */
+            height: auto; /* Высота автоматически подстраивается */
+            aspect-ratio: 1 / 1; /* Сохранение пропорций 1:1 */
+            margin: 20px auto;
+            border: 2px solid #333;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .puzzle-piece {
+            position: absolute;
+            background-size: cover;
+            cursor: url(cat.svg), url(cat.png), url(cat.cur), pointer;
+            transition: all 0.3s;
+            border: 1px solid #ccc;
+            z-index: 1;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+            /* Размеры задаются через JavaScript для учета размера контейнера */
+        }
+
+        .puzzle-piece.active {
+            z-index: 2;
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .puzzle-piece:hover {
+            transform: scale(1.1);
+            cursor: url(cat.svg), url(cat.png), url(cat.cur), pointer;
+        }
+
+        #puzzle-form {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        #puzzle-form label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        #imageInput {
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #367c39;
+        }
+
+        #message {
+            text-align: center;
+            font-size: 1.2em;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="puzzle-container"></div>
+
+    <form id="puzzle-form">
+        <label for="imageInput">Выберите изображение:</label>
+        <input type="file" id="imageInput" name="imageInput" accept="image/*" aria-label="Выбор изображения">
+        <button id="startButton" type="button">Начать игру</button>
+    </form>
+
+    <div id="message" role="status"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const puzzleContainer = document.getElementById('puzzle-container');
+            const imageInput = document.getElementById('imageInput');
+            const startButton = document.getElementById('startButton');
+            const messageDiv = document.getElementById('message');
+
+            let image;
+            let pieces = [];
+            let shuffledPieces = [];
+            let activePiece;
+            let PIECE_SIZE;
+
+            startButton.addEventListener('click', startGame);
+
+            imageInput.addEventListener('change', function (e) {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    image = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            function startGame() {
+                if (!image) {
+                    alert('Пожалуйста, выберите изображение');
+                    return;
+                }
+                createPuzzle();
+            }
+
+            function createPuzzle() {
+                puzzleContainer.innerHTML = '';
+                pieces = [];
+
+                // Вычисление размера пазла в зависимости от размера контейнера
+                PIECE_SIZE = puzzleContainer.offsetWidth / 6;
+
+                for (let i = 0; i < 36; i++) {
+                    const piece = document.createElement('div');
+                    piece.classList.add('puzzle-piece');
+                    piece.style.width = `${PIECE_SIZE}px`;
+                    piece.style.height = `${PIECE_SIZE}px`;
+
+                    const x = (i % 6) * PIECE_SIZE;
+                    const y = Math.floor(i / 6) * PIECE_SIZE;
+
+                    piece.style.backgroundImage = `url(${image})`;
+                    piece.style.backgroundPosition = `-${x}px -${y}px`;
+                    piece.style.backgroundSize = `${puzzleContainer.offsetWidth}px ${puzzleContainer.offsetHeight}px`;
+                    piece.dataset.index = i;
+
+                    pieces.push(piece);
+                }
+
+                shuffledPieces = shuffleArray([...pieces]);
+
+                shuffledPieces.forEach((piece, index) => {
+                    const x = (index % 6) * PIECE_SIZE;
+                    const y = Math.floor(index / 6) * PIECE_SIZE;
+                    piece.style.left = `${x}px`;
+                    piece.style.top = `${y}px`;
+                    puzzleContainer.appendChild(piece);
+                });
+
+                addDragEvents();
+            }
+
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            function addDragEvents() {
+                shuffledPieces.forEach(piece => {
+                    let isDragging = false;
+                    let offsetX, offsetY;
+                    let originalX, originalY;
+
+                    const startDrag = (clientX, clientY) => {
+                        isDragging = true;
+                        activePiece = piece;
+                        piece.classList.add('active');
+
+                        const rect = piece.getBoundingClientRect();
+                        offsetX = clientX - rect.left;
+                        offsetY = clientY - rect.top;
+
+                        const index = shuffledPieces.indexOf(piece);
+                        originalX = (index % 6) * PIECE_SIZE;
+                        originalY = Math.floor(index / 6) * PIECE_SIZE;
+                        piece.style.zIndex = 2;
+                    };
+
+                    const drag = (clientX, clientY) => {
+                        if (!isDragging) return;
+
+                        piece.style.left = `${clientX - offsetX - puzzleContainer.offsetLeft}px`;
+                        piece.style.top = `${clientY - offsetY - puzzleContainer.offsetTop}px`;
+                    };
+
+                    const stopDrag = () => {
+                        if (isDragging) {
+                            isDragging = false;
+                            piece.classList.remove('active');
+                            piece.style.zIndex = 1;
+
+                            const targetPiece = findTargetPiece(piece);
+                            if (targetPiece && targetPiece !== piece) {
+                                swapPieces(piece, targetPiece);
+                            } else {
+                                piece.style.left = `${originalX}px`;
+                                piece.style.top = `${originalY}px`;
+                            }
+                            checkIfSolved();
+                        }
+                    };
+
+                    piece.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        startDrag(e.clientX, e.clientY);
+                    });
+
+                    piece.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        startDrag(e.touches[0].clientX, e.touches[0].clientY);
+                    });
+
+                    document.addEventListener('mousemove', (e) => {
+                        drag(e.clientX, e.clientY);
+                    });
+
+                    document.addEventListener('touchmove', (e) => {
+                        drag(e.touches[0].clientX, e.touches[0].clientY);
+                    });
+
+                    document.addEventListener('mouseup', stopDrag);
+                    document.addEventListener('touchend', stopDrag);
+                    document.addEventListener('mouseleave', stopDrag);
+                });
+            }
+
+            function findTargetPiece(piece) {
+                const rect = piece.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+
+                return shuffledPieces.find(other => {
+                    if (other === piece) return false;
+                    const otherRect = other.getBoundingClientRect();
+                    return centerX >= otherRect.left &&
+                        centerX <= otherRect.right &&
+                        centerY >= otherRect.top &&
+                        centerY <= otherRect.bottom;
+                });
+            }
+
+            function swapPieces(piece1, piece2) {
+                const index1 = shuffledPieces.indexOf(piece1);
+                const index2 = shuffledPieces.indexOf(piece2);
+
+                [shuffledPieces[index1], shuffledPieces[index2]] = [piece2, piece1];
+
+                const updatePosition = (piece, index) => {
+                    const x = (index % 6) * PIECE_SIZE;
+                    const y = Math.floor(index / 6) * PIECE_SIZE;
+                    piece.style.left = `${x}px`;
+                    piece.style.top = `${y}px`;
+                    piece.style.transform = '';
+                };
+
+                updatePosition(piece1, index2);
+                updatePosition(piece2, index1);
+            }
+
+            function checkIfSolved() {
+                const isSolved = shuffledPieces.every((piece, index) => {
+                    return parseInt(piece.dataset.index) === index;
+                });
+
+                if (isSolved) {
+                    messageDiv.textContent = 'Пазл решен!';
+                } else {
+                    messageDiv.textContent = '';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
